@@ -1,99 +1,103 @@
 # app/signals/basic.py
+
 from __future__ import annotations
 
-import importlib
+from collections.abc import Iterable
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
-from app.ml.infer import Predictor
+
+def _ensure_df(raw: Any) -> pd.DataFrame:
+    """
+    Accepts:
+      - dict payload like {"candles": [{ts, open, high, low, close, volume}, ...]}
+      - list[dict] of candles
+      - DataFrame with OHLCV
+    Returns a DataFrame with columns: open, high, low, close, volume (float)
+    """
+    if isinstance(raw, dict) and "candles" in raw:
+        data = raw["candles"]
+    elif isinstance(raw, Iterable) and not isinstance(raw, str | bytes):
+        data = raw
+    elif isinstance(raw, pd.DataFrame):
+        df = raw.copy()
+        for col in ("open", "high", "low", "close", "volume"):
+            if col in df:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+        return df[["open", "high", "low", "close", "volume"]]
+
+    df = pd.DataFrame(list(data))
+    # some sources use 'ts' instead of 'time' — keep as index if present
+    if "ts" in df and "time" not in df:
+        df = df.sort_values("ts").reset_index(drop=True)
+    elif "time" in df:
+        df = df.sort_values("time").reset_index(drop=True)
+
+    # coerce numeric
+    for col in ("open", "high", "low", "close", "volume"):
+        if col in df:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        else:
+            df[col] = np.nan
+
+    return df[["open", "high", "low", "close", "volume"]]
 
 
-def _resolve_func(modname: str, names: list[str]):
-    try:
-        mod = importlib.import_module(modname)
-    except Exception:
-        return None
-    for nm in names:
-        fn = getattr(mod, nm, None)
-        if callable(fn):
-            return fn
-    return None
+def _rsi(prices: pd.Series, period: int = 14) -> pd.Series:
+    delta = prices.diff()
+    up = delta.clip(lower=0.0).astype(float)
+    down = (-delta.clip(upper=0.0)).astype(float)
+    roll_up = up.rolling(period, min_periods=period).mean()
+    roll_down = down.rolling(period, min_periods=period).mean()
+    rs = roll_up / roll_down.replace(0.0, np.nan)
+    rsi = 100.0 - (100.0 / (1.0 + rs))
+    return rsi
 
 
-def _to_dataframe(raw: Any) -> pd.DataFrame:
-    if isinstance(raw, pd.DataFrame):
-        return raw.copy()
-    if isinstance(raw, dict):
-        # Common container keys
-        for key in ("candles", "bars", "items", "data", "result"):
-            if key in raw and isinstance(raw[key], list | tuple):
-                return pd.DataFrame(raw[key])
-        # dict-of-arrays
-        try:
-            return pd.DataFrame(raw)
-        except Exception:
-            pass
-    if isinstance(raw, list | tuple):
-        return pd.DataFrame(list(raw))
-    raise TypeError("cannot convert input to DataFrame")
+def _sma(s: pd.Series, n: int) -> pd.Series:
+    return s.rolling(n, min_periods=n).mean()
+
+
+def _ret(s: pd.Series, n: int) -> pd.Series:
+    return s.pct_change(n)
 
 
 def build_features(raw: Any) -> pd.DataFrame:
     """
-    Normalize an OHLCV-like structure into a feature frame suitable for Predictor().
-    - Renames short columns (o/h/l/c/v) to open/high/low/close/volume
-    - Ensures numeric dtypes
-    - Keeps ordering to match Predictor().feature_names when available
+    Normalize OHLCV into the features expected by the trained model.
+    Guaranteed outputs when enough rows exist:
+      ret_1, ret_3, sma_5, sma_10, sma_20, rsi_14, vol_10, typ_price, tp_sma_10
+
+    Returns a DataFrame whose columns will be trimmed/reordered later in the router
+    to match Predictor().feature_names if available.
     """
-    df = _to_dataframe(raw)
+    df = _ensure_df(raw)
 
-    # Rename common short forms to canonical names
-    rename_map: dict[str, str] = {}
-    if "o" in df.columns and "open" not in df.columns:
-        rename_map["o"] = "open"
-    if "h" in df.columns and "high" not in df.columns:
-        rename_map["h"] = "high"
-    if "l" in df.columns and "low" not in df.columns:
-        rename_map["l"] = "low"
-    if "c" in df.columns and "close" not in df.columns:
-        rename_map["c"] = "close"
-    if "v" in df.columns and "volume" not in df.columns:
-        rename_map["v"] = "volume"
-    if rename_map:
-        df = df.rename(columns=rename_map)
+    # bases
+    df_feat = pd.DataFrame(index=df.index)
+    df_feat["open"] = df["open"].astype(float)
+    df_feat["high"] = df["high"].astype(float)
+    df_feat["low"] = df["low"].astype(float)
+    df_feat["close"] = df["close"].astype(float)
+    df_feat["volume"] = df["volume"].astype(float)
 
-    # Coerce to numeric where present
-    for col in ("open", "high", "low", "close", "volume"):
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
+    # derived bases
+    df_feat["typ_price"] = (df_feat["high"] + df_feat["low"] + df_feat["close"]) / 3.0
 
-    # Basic derived features (safe/no lookahead)
-    if {"close", "open"}.issubset(df.columns):
-        df["ret_1"] = df["close"].pct_change().fillna(0.0)
-    else:
-        df["ret_1"] = 0.0
+    # required features
+    df_feat["ret_1"] = _ret(df_feat["close"], 1)
+    df_feat["ret_3"] = _ret(df_feat["close"], 3)
+    df_feat["sma_5"] = _sma(df_feat["close"], 5)
+    df_feat["sma_10"] = _sma(df_feat["close"], 10)
+    df_feat["sma_20"] = _sma(df_feat["close"], 20)
+    df_feat["rsi_14"] = _rsi(df_feat["close"], 14)
+    df_feat["vol_10"] = df_feat["volume"].rolling(10, min_periods=10).mean()
+    df_feat["tp_sma_10"] = _sma(df_feat["typ_price"], 10)
 
-    # SMA examples if close exists
-    if "close" in df.columns:
-        df["sma_5"] = df["close"].rolling(5, min_periods=1).mean()
-        df["sma_10"] = df["close"].rolling(10, min_periods=1).mean()
-        df["sma_20"] = df["close"].rolling(20, min_periods=1).mean()
-    else:
-        df["sma_5"] = 0.0
-        df["sma_10"] = 0.0
-        df["sma_20"] = 0.0
+    # drop warmup NaNs so model sees only complete rows
+    df_feat = df_feat.dropna().reset_index(drop=True)
 
-    # Reorder columns to match model if available
-    try:
-        pred = Predictor()
-        feature_names = getattr(pred, "feature_names", None)
-        if feature_names:
-            # keep only known features in correct order, append extras at the end
-            known = [c for c in feature_names if c in df.columns]
-            extras = [c for c in df.columns if c not in known]
-            df = df[known + extras]
-    except Exception:
-        pass
-
-    return df.fillna(0.0)
+    # Return ALL engineered columns; the router will select/align to model.feature_names
+    return df_feat

@@ -128,6 +128,66 @@ tests/                   # Unit tests
 
 ---
 
+## 🚀 Release & Raspberry Pi Deploy (v0.2.0)
+
+This service is packaged for Raspberry Pi via Docker Compose profiles.
+
+### Prereqs
+- Docker + Docker Compose installed on the Pi
+- Repo cloned on the Pi: `~/signalforge`
+- Model artifacts present in `./data`:
+  - `data/model.pkl`, `data/scaler.pkl`, `data/model_meta.json`, `data/eval_report.json`
+
+### Quick Start (Pi)
+```bash
+cd ~/signalforge
+
+# (Optional) review env knobs (safe template)
+cat .env.example
+
+# Build & run the Pi profile
+docker compose --profile pi build api-pi
+docker compose --profile pi up -d api-pi
+
+# Wait for healthcheck to pass
+docker ps --filter "name=api-pi"
+```
+
+You should see: `Up ... (healthy)` and port mapping `0.0.0.0:8010->8000/tcp`.
+
+### Verify
+```bash
+# Health & version
+curl -s http://localhost:8010/health | jq
+curl -s http://localhost:8010/version | jq
+
+# Inference (synthetic path to avoid external rate limits)
+curl -s -X POST "http://localhost:8010/api/v1/score"   -H "Content-Type: application/json"   -d '{"symbol":"AAPL","interval":"5m","limit":180,"synthetic":1,"synthetic_mode":"up"}' | jq
+```
+
+Expected fields: `n_rows_scored`, `last.proba`, `last.pred`, and `model_version`.
+
+### Ports
+- Host **8010** → container **8000** (FastAPI/Uvicorn)
+
+### Logs & Troubleshooting
+```bash
+# Tail logs
+docker logs -f signalforge-api-pi
+
+# Port in use?
+docker ps --format "table {{.Names}}	{{.Ports}}" | grep 8010
+# If a dev container holds 8010, stop it:
+docker stop signalforge-api-dev
+```
+
+### Notes
+- `/version` reports `service` (e.g., `signalforge-api:0.2.0`) and the loaded `model_version`.
+- Live data uses Yahoo and may rate-limit (HTTP 429). The API auto-falls back to **synthetic** when `synthetic=1` or on 429/network errors.
+- Env knobs are documented in `.env.example`. Don’t commit a real `.env`.
+
+---
+
 ## Contributing
 
 We use pre-commit hooks to enforce style and linting:
