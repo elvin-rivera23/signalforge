@@ -1,0 +1,33 @@
+{
+  "features": [
+    "ret_1",
+    "ret_3",
+    "sma_5",
+    "sma_10",
+    "sma_20",
+    "rsi_14",
+    "vol_10",
+    "typ_price",
+    "tp_sma_10"
+  ],
+  "target": "target_up_next_N",
+  "threshold": 0.2,
+  "model": "LogisticRegression",
+  "params": {
+    "C": 1.0,
+    "max_iter": 1000,
+    "class_weight": "balanced"
+  },
+  "dataset_path": "data/dataset_AAPL_5m_v0_20250904T222400Z.parquet",
+  "feature_names": [
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "ret_1",
+    "ret_3",
+    "sma_5",
+    "sma_10"
+  ]
+}

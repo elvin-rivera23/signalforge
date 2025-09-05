@@ -1,0 +1,86 @@
+{
+  "dataset_path": "data/dataset_AAPL_5m_v0_20250904T222400Z.parquet",
+  "n_rows": 980,
+  "split": {
+    "train": 686,
+    "val": 147,
+    "test": 147
+  },
+  "features": [
+    "ret_1",
+    "ret_3",
+    "sma_5",
+    "sma_10",
+    "sma_20",
+    "rsi_14",
+    "vol_10",
+    "typ_price",
+    "tp_sma_10"
+  ],
+  "target": "target_up_next_N",
+  "model": "LogisticRegression",
+  "params": {
+    "C": 1.0,
+    "max_iter": 1000,
+    "class_weight": "balanced",
+    "threshold": 0.2
+  },
+  "metrics": {
+    "train": {
+      "auc": 0.6048847142461277,
+      "accuracy": 0.6661807580174927,
+      "precision": 0.6661807580174927,
+      "recall": 1.0,
+      "f1": 0.799650043744532,
+      "confusion_matrix": [
+        [
+          0,
+          229
+        ],
+        [
+          0,
+          457
+        ]
+      ]
+    },
+    "val": {
+      "auc": 0.3184089962515618,
+      "accuracy": 0.5510204081632653,
+      "precision": 0.625,
+      "recall": 0.8163265306122449,
+      "f1": 0.7079646017699115,
+      "confusion_matrix": [
+        [
+          1,
+          48
+        ],
+        [
+          18,
+          80
+        ]
+      ]
+    },
+    "test": {
+      "auc": 0.5285947712418301,
+      "accuracy": 0.6598639455782312,
+      "precision": 0.6666666666666666,
+      "recall": 0.9583333333333334,
+      "f1": 0.7863247863247863,
+      "confusion_matrix": [
+        [
+          5,
+          46
+        ],
+        [
+          4,
+          92
+        ]
+      ]
+    }
+  },
+  "toy_profit_sum": {
+    "train": 0.6041763378150864,
+    "val": 0.10584646285299959,
+    "test": 0.10111536099317775
+  }
+}

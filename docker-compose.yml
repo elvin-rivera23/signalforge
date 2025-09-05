@@ -1,0 +1,55 @@
+services:
+  api-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: signalforge:dev
+    container_name: signalforge-api-dev
+    ports:
+      - "8010:8000"
+    environment:
+      # Logging + version info (CI can override later)
+      - LOG_LEVEL=INFO
+      - MODEL_VERSION=${MODEL_VERSION:-unloaded}
+      - FEATURESET=${FEATURESET:-none}
+      - GIT_COMMIT_SHA=${GIT_COMMIT_SHA:-local}
+      - BUILD_TIME=${BUILD_TIME:-${BUILD_TIME_OVERRIDE:-}}
+      # Uvicorn concurrency (dev: 1 worker for easier debugging)
+      - UVICORN_WORKERS=1
+    volumes:
+      - ./data:/app/data:rw
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import json,urllib.request,sys; j=json.load(urllib.request.urlopen('http://localhost:8000/health',timeout=3)); sys.exit(0 if j.get('status')=='ok' else 1)\""]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    profiles: ["dev"]
+
+  api-pi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: signalforge:pi
+    container_name: signalforge-api-pi
+    ports:
+      - "8010:8000"
+    environment:
+      - LOG_LEVEL=INFO
+      - MODEL_VERSION=${MODEL_VERSION:-unloaded}
+      - FEATURESET=${FEATURESET:-none}
+      - GIT_COMMIT_SHA=${GIT_COMMIT_SHA:-local}
+      - BUILD_TIME=${BUILD_TIME:-${BUILD_TIME_OVERRIDE:-}}
+      # Keep it lightweight on Pi
+      - UVICORN_WORKERS=1
+    volumes:
+      - ./data:/app/data:rw
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import json,urllib.request,sys; j=json.load(urllib.request.urlopen('http://localhost:8000/health',timeout=3)); sys.exit(0 if j.get('status')=='ok' else 1)\""]
+      interval: 30s
+      timeout: 6s
+      retries: 10
+      start_period: 40s
+    restart: unless-stopped
+    profiles: ["pi"]

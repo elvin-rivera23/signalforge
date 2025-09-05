@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>SignalForge — Playground</title>
+  <meta http-equiv="refresh" content="10">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; max-width: 780px; box-shadow: 0 2px 12px rgba(0,0,0,0.06);}
+    .row { display: flex; gap: 16px; flex-wrap: wrap; }
+    .kv { flex: 1; min-width: 160px; background: #fafafa; border-radius: 8px; padding: 12px; }
+    .muted { color: #666; }
+    .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #eee; font-weight: 600; }
+    .badge.BUY { background: #d6f5d6; }
+    .badge.SELL { background: #ffe0e0; }
+    .badge.HOLD { background: #e9ecff; }
+    form { margin-bottom: 16px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    input, select, button { padding: 8px; border-radius: 8px; border: 1px solid #ccc; }
+    button { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>SignalForge — Playground</h1>
+  <p class="muted">Auto-refreshes every 10s. Adjust inputs and submit to update.</p>
+
+  <form method="get" action="/playground">
+    <label>Symbol <input type="text" name="symbol" value="{{ symbol }}" /></label>
+    <label>Interval
+      <select name="interval">
+        {% for iv in ["1m","5m","15m","1h","1d"] %}
+          <option value="{{ iv }}" {% if iv == interval %}selected{% endif %}>{{ iv }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Fast SMA <input type="number" name="sma_fast" value="{{ sma_fast }}" min="2" max="200"/></label>
+    <label>Slow SMA <input type="number" name="sma_slow" value="{{ sma_slow }}" min="3" max="400"/></label>
+    <label>Synth?
+      <select name="synthetic">
+        <option value="0" {% if synthetic == 0 %}selected{% endif %}>No</option>
+        <option value="1" {% if synthetic == 1 %}selected{% endif %}>Yes</option>
+      </select>
+    </label>
+    <label>Mode
+      <select name="synthetic_mode">
+        {% for m in ["up","down","flat"] %}
+          <option value="{{ m }}" {% if m == synthetic_mode %}selected{% endif %}>{{ m }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Update</button>
+  </form>
+
+  <div class="card">
+    <h2>{{ symbol }} • {{ interval }} • <span class="badge {{ data.features.decision }}">{{ data.features.decision }}</span></h2>
+    <p class="muted">
+      Model: {{ data.meta.model_version }} · Source: {{ data.meta.source }} · Data: {{ data.meta.data_source }} · Candles: {{ data.features.num_candles }}
+    </p>
+
+    <div class="row">
+      <div class="kv">
+        <div class="muted">Latest Close</div>
+        <div><strong>
+          {% if data.features.latest_close is not none %}{{ "{:,.2f}".format(data.features.latest_close) }}{% else %}—{% endif %}
+        </strong></div>
+      </div>
+      <div class="kv">
+        <div class="muted">SMA Fast ({{ data.features.sma_fast_p }})</div>
+        <div><strong>
+          {% if data.features.sma_fast is not none %}{{ "{:,.2f}".format(data.features.sma_fast) }}{% else %}—{% endif %}
+        </strong></div>
+      </div>
+      <div class="kv">
+        <div class="muted">SMA Slow ({{ data.features.sma_slow_p }})</div>
+        <div><strong>
+          {% if data.features.sma_slow is not none %}{{ "{:,.2f}".format(data.features.sma_slow) }}{% else %}—{% endif %}
+        </strong></div>
+      </div>
+      <div class="kv">
+        <div class="muted">RSI(14)</div>
+        <div><strong>
+          {% if data.features.rsi14 is not none %}{{ "{:,.1f}".format(data.features.rsi14) }}{% else %}—{% endif %}
+        </strong> <span class="muted">({{ data.features.rsi_state }})</span></div>
+      </div>
+      <div class="kv">
+        <div class="muted">Crossover</div>
+        <div><strong>{{ data.features.crossover }}</strong></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

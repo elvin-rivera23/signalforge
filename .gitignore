@@ -1,0 +1,42 @@
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+*.log
+
+# --- Virtual environments ---
+.venv/
+venv/
+
+# --- Build & dist ---
+build/
+dist/
+
+# --- Test & lint caches ---
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# --- Local data / artifacts ---
+data/*.parquet
+data/*.json
+!data/model_meta.json
+!data/eval_report.json
+data/*.pkl
+
+# --- Models ---
+models/*.pkl
+models/*.json
+
+# --- Editors & OS ---
+.DS_Store
+*.swp
+*.swo
+
+# --- Docker ---
+.env
+*.pid
+*.seed
